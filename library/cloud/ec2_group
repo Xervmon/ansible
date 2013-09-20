@@ -37,6 +37,13 @@ options:
     required: false
     default: null
     aliases: []
+  state:
+    description:
+      - Create or delete security group
+    default: present
+    required: false
+    aliases: []
+
   ec2_secret_key:
     description:
       - EC2 secret key
@@ -105,6 +112,7 @@ def main():
             ec2_secret_key=dict(aliases=['EC2_SECRET_KEY'], no_log=True),
             ec2_access_key=dict(aliases=['EC2_ACCESS_KEY']),
             region=dict(choices=['eu-west-1', 'sa-east-1', 'us-east-1', 'ap-northeast-1', 'us-west-2', 'us-west-1', 'ap-southeast-1', 'ap-southeast-2']),
+            state=dict(default='present')
         ),
         supports_check_mode=True,
     )
@@ -159,12 +167,22 @@ def main():
         for r in rs:
             for i in r.instances:
                 group_in_use |= reduce(lambda x, y: x | (y.name == 'public-ssh'), i.groups, False)
+        if state == 'absent':
+            if group_in_use:
+                module.fail_json(msg="Group is in use so cannot be deleted.")
+            group_id = group.id
+            group.delete()
+            changed = True
+            module.exit_json(changed, group_id)
 
         if group.description != description:
             if group_in_use:
                 module.fail_json(msg="Group description does not match, but it is in use so cannot be changed.")
             group.delete()
             group = None
+    else:
+        if state == 'absent':
+            module.fail_json(msg="Group with name %s does not exist" % name)
 
     # if the group doesn't exist, create it now
     if not group:

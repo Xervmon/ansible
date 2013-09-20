@@ -1,0 +1,177 @@
+#!/usr/bin/python
+# This file is part of Ansible
+#
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+
+DOCUMENTATION = '''
+---
+module: ec2_keypair
+short_description: create or terminate an ec2 keypair, return instanceid
+description:
+     - Creates or terminates ec2 keypair. This module has a dependency on python-boto >= 2.5
+options:
+  key_name:
+    description:
+      - key pair to create
+    required: true
+    aliases: ['keypair']
+  region:
+    description:
+      - The AWS region to use.  Must be specified if ec2_url is not used. If not specified then the value of the EC2_REGION environment variable, if any, is used.
+    required: true
+    default: null
+    aliases: [ 'aws_region', 'ec2_region' ]
+  ec2_url:
+    description:
+      - Url to use to connect to EC2 or your Eucalyptus cloud (by default the module will use EC2 endpoints)
+    required: false
+    default: null
+  key_dir:
+    description:
+      - Directory to save file
+    default: ~/.ssh
+    required: false
+    aliases: [ 'key_directory' ]
+  aws_secret_key:
+    description:
+      - AWS secret key. If not set then the value of the AWS_SECRET_KEY environment variable is used.
+    required: false
+    default: null
+    aliases: [ 'ec2_secret_key', 'secret_key' ]
+  aws_access_key:
+    description:
+      - AWS access key. If not set then the value of the AWS_ACCESS_KEY environment variable is used.
+    required: false
+    default: null
+    aliases: [ 'ec2_access_key', 'access_key' ]
+  state:
+    description:
+      - create or terminate instances
+    required: false
+    default: 'present'
+    aliases: []
+
+requirements: [ "boto" ]
+author: Artemiy Rodionov
+'''
+
+EXAMPLES = '''
+
+# Basic provisioning example
+- local_action:
+    module: ec2_keypair
+    key_name: mykey
+    aws_access_key: ABC
+    aws_secret_key: abasbasbas1241s
+    region: us-west-1
+
+'''
+
+import sys
+import time
+
+KEYFILE_EXTENSION = '.pem'
+
+AWS_REGIONS = ['ap-northeast-1',
+               'ap-southeast-1',
+               'ap-southeast-2',
+               'eu-west-1',
+               'sa-east-1',
+               'us-east-1',
+               'us-west-1',
+               'us-west-2']
+
+try:
+    import boto.ec2
+    from boto.exception import EC2ResponseError, BotoClientError
+except ImportError:
+    print "failed=True msg='boto required for this module'"
+    sys.exit(1)
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec = dict(
+            key_dir = dict(aliases = ['key_directory'], default='~/.ssh'),
+            key_name = dict(aliases = ['keypair'], required=True),
+            ec2_url=dict(aliases=['EC2_URL']),
+            region = dict(aliases=['aws_region', 'ec2_region'], choices=AWS_REGIONS),
+            aws_secret_key = dict(aliases=['ec2_secret_key', 'secret_key'], no_log=True),
+            aws_access_key = dict(aliases=['ec2_access_key', 'access_key']),
+            state = dict(default='present'),
+        )
+    )
+
+    aws_secret_key = module.params.get('aws_secret_key')
+    aws_access_key = module.params.get('aws_access_key')
+    region = module.params.get('region')
+    ec2_url = module.params.get('ec2_url')
+    key_name = module.params.get('key_name')
+    key_dir = os.path.expanduser(module.params.get('key_dir'))
+
+    changed = False
+
+    # allow eucarc environment variables to be used if ansible vars aren't set
+    if not ec2_url and 'EC2_URL' in os.environ:
+        ec2_url = os.environ['EC2_URL']
+
+    if not aws_secret_key:
+        if  'AWS_SECRET_KEY' in os.environ:
+            aws_secret_key = os.environ['AWS_SECRET_KEY']
+        elif 'EC2_SECRET_KEY' in os.environ:
+            aws_secret_key = os.environ['EC2_SECRET_KEY']
+
+    if not aws_access_key:
+        if 'AWS_ACCESS_KEY' in os.environ:
+            aws_access_key = os.environ['AWS_ACCESS_KEY']
+        elif 'EC2_ACCESS_KEY' in os.environ:
+            aws_access_key = os.environ['EC2_ACCESS_KEY']
+
+    if not region:
+        if 'AWS_REGION' in os.environ:
+            region = os.environ['AWS_REGION']
+        elif 'EC2_REGION' in os.environ:
+            region = os.environ['EC2_REGION']
+
+    # If we have a region specified, connect to its endpoint.
+    if region:
+        try:
+            ec2 = boto.ec2.connect_to_region(region, aws_access_key_id=aws_access_key, aws_secret_access_key=aws_secret_key)
+        except boto.exception.NoAuthHandlerFound, e:
+            module.fail_json(msg = str(e))
+    # If we specified an ec2_url then try connecting to it
+    elif ec2_url:
+        try:
+            ec2 = boto.connect_ec2_endpoint(ec2_url, aws_access_key, aws_secret_key)
+        except boto.exception.NoAuthHandlerFound, e:
+            module.fail_json(msg = str(e))
+    else:
+        module.fail_json(msg="Either region or ec2_url must be specified")
+
+    key = ec2.get_key_pair(key_name)
+    if not key:
+        key = ec2.create_key_pair(key_name)
+        changed = True
+        try:
+            key.save(key_dir)
+        except BotoClientError, e:
+            module.fail_json(msg=str(e))
+
+    module.exit_json(changed=changed, keyname=key.name)
+
+
+# this is magic, see lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+
+main()
