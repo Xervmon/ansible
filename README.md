@@ -1,3 +1,18 @@
+Changes from original
+=====================
+
+Added modules
+-------------
+
+  * [ec2_elasticip] (library/modules/ec2_elasticip)
+  * [ec2_keypair] (library/modules/ec2_keypair)
+
+Changed modules
+---------------
+
+  * [ec2_group] (library/modules/ec2_group)
+
+
 Ansible
 =======
 
