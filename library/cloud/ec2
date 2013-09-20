@@ -105,7 +105,7 @@ options:
     aliases: []
   aws_secret_key:
     description:
-      - AWS secret key. If not set then the value of the AWS_SECRET_KEY environment variable is used. 
+      - AWS secret key. If not set then the value of the AWS_SECRET_KEY environment variable is used.
     required: false
     default: null
     aliases: [ 'ec2_secret_key', 'secret_key' ]
@@ -167,6 +167,12 @@ options:
     version_added: "1.3"
     description:
       - Name of the IAM instance profile to use
+    required: false
+    default: null
+    aliases: []
+  instance_id:
+    description:
+      - an instance id, currently only used when state='absent'
     required: false
     default: null
     aliases: []
@@ -549,6 +555,7 @@ def main():
             private_ip = dict(),
             instance_profile_name = dict(),
             instance_ids = dict(type='list'),
+            instance_id=dict(),
             state = dict(default='present'),
         )
     )
@@ -598,8 +605,12 @@ def main():
 
     if module.params.get('state') == 'absent':
         instance_ids = module.params.get('instance_ids')
+        instance_id = module.params.get('instance_id')
         if not isinstance(instance_ids, list):
-            module.fail_json(msg='termination_list needs to be a list of instances to terminate')
+            if not instance_id:
+                module.fail_json(msg='termination_list needs to be a list of instances to terminate')
+            instance_ids = []
+        instance_ids.append(instance_id)
 
         (changed, instance_dict_array, new_instance_ids) = terminate_instances(module, ec2, instance_ids)
 

@@ -10,7 +10,9 @@ Added modules
 Changed modules
 ---------------
 
-  * [ec2_group] (library/cloud/ec2_group)
+  * [ec2_group] (library/cloud/ec2_group) - Added state option 'absent' to remove security group
+  * [ec2] (library/cloud/ec2) - Added single instance_id option to remove
+  * [ec2_vol] (library/cloud/ec2_vol) - Added delete and detach state
 
 
 Ansible

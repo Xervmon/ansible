@@ -124,6 +124,7 @@ def main():
     ec2_secret_key = module.params.get('ec2_secret_key')
     ec2_access_key = module.params.get('ec2_access_key')
     region = module.params.get('region')
+    state = module.params.get('state')
 
     changed = False
 
@@ -170,10 +171,9 @@ def main():
         if state == 'absent':
             if group_in_use:
                 module.fail_json(msg="Group is in use so cannot be deleted.")
-            group_id = group.id
             group.delete()
             changed = True
-            module.exit_json(changed, group_id)
+            module.exit_json(changed=changed, group_id=None)
 
         if group.description != description:
             if group_in_use:
