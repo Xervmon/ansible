@@ -610,7 +610,8 @@ def main():
             if not instance_id:
                 module.fail_json(msg='termination_list needs to be a list of instances to terminate')
             instance_ids = []
-        instance_ids.append(instance_id)
+        if instance_id:
+            instance_ids.append(instance_id)
 
         (changed, instance_dict_array, new_instance_ids) = terminate_instances(module, ec2, instance_ids)
 
